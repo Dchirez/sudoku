@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sudoku — dchirez.fr</title>
+<meta name="description" content="Jouez au sudoku en ligne : 5 niveaux de difficulté, 3 vies par partie. Grilles à solution unique générées à la volée.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --papier:#EFF1F4;
+    --grille:#FFFFFF;
+    --encre:#182742;
+    --encre-douce:#5B6472;
+    --stylo:#2B5BB7;
+    --stylo-pale:#DCE6F7;
+    --vermillon:#C8402F;
+    --vermillon-pale:#F7E2DE;
+    --trait:#C6CBD4;
+    --trait-fort:#182742;
+    --surbrillance:#E7ECF3;
+    --meme-chiffre:#D8E2F2;
+    --radius:10px;
+    --fdisplay:'Bitter', Georgia, serif;
+    --fmono:'IBM Plex Mono', 'Courier New', monospace;
+    --fsans:'IBM Plex Sans', system-ui, sans-serif;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    background:var(--papier);
+    color:var(--encre);
+    font-family:var(--fsans);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px 14px 40px;
+  }
+
+  /* ---------- En-tête ---------- */
+  header{ text-align:center; margin-bottom:18px; }
+  .eyebrow{
+    font-family:var(--fmono);
+    font-size:12px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--encre-douce);
+  }
+  h1{
+    font-family:var(--fdisplay);
+    font-weight:900;
+    font-size:clamp(34px, 7vw, 52px);
+    letter-spacing:.04em;
+    line-height:1.05;
+  }
+  h1 .point{ color:var(--vermillon); }
+  .sous-titre{
+    font-size:13px;
+    color:var(--encre-douce);
+    margin-top:4px;
+  }
+
+  /* ---------- Difficultés ---------- */
+  .difficultes{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .chip{
+    font-family:var(--fsans);
+    font-size:13px;
+    font-weight:600;
+    padding:8px 14px;
+    border:1.5px solid var(--trait);
+    border-radius:999px;
+    background:var(--grille);
+    color:var(--encre-douce);
+    cursor:pointer;
+    transition:border-color .15s, color .15s, background .15s;
+  }
+  .chip:hover{ border-color:var(--encre); color:var(--encre); }
+  .chip[aria-pressed="true"]{
+    background:var(--encre);
+    border-color:var(--encre);
+    color:#fff;
+  }
+  .chip:focus-visible, button:focus-visible{
+    outline:3px solid var(--stylo);
+    outline-offset:2px;
+  }
+
+  /* ---------- Barre d'état ---------- */
+  .etat{
+    width:min(92vw, 480px);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+    font-family:var(--fmono);
+    font-size:14px;
+    color:var(--encre-douce);
+  }
+  .vies{ display:flex; gap:6px; align-items:center; }
+  .coeur{
+    font-size:20px;
+    line-height:1;
+    color:var(--vermillon);
+    transition:transform .25s, color .25s, opacity .25s;
+  }
+  .coeur.perdu{
+    color:var(--trait);
+    position:relative;
+    transform:scale(.85);
+  }
+  .coeur.perdu::after{
+    content:"";
+    position:absolute;
+    left:-3px; right:-3px; top:50%;
+    height:2.5px;
+    background:var(--vermillon);
+    transform:rotate(-18deg);
+  }
+  @keyframes secousse{
+    0%,100%{ transform:translateX(0); }
+    20%{ transform:translateX(-5px); }
+    40%{ transform:translateX(5px); }
+    60%{ transform:translateX(-3px); }
+    80%{ transform:translateX(3px); }
+  }
+  .vies.secoue{ animation:secousse .4s; }
+  @media (prefers-reduced-motion: reduce){
+    .vies.secoue{ animation:none; }
+    .coeur{ transition:none; }
+  }
+
+  /* ---------- Grille ---------- */
+  .plateau{
+    width:min(92vw, 480px);
+    aspect-ratio:1;
+    background:var(--grille);
+    border:3px solid var(--trait-fort);
+    border-radius:6px;
+    display:grid;
+    grid-template-columns:repeat(9, 1fr);
+    grid-template-rows:repeat(9, 1fr);
+    box-shadow:0 10px 30px rgba(24,39,66,.10);
+    user-select:none;
+    touch-action:manipulation;
+  }
+  .case{
+    border:.5px solid var(--trait);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:var(--fmono);
+    font-weight:500;
+    font-size:clamp(18px, 4.2vw, 26px);
+    color:var(--encre);
+    cursor:pointer;
+    position:relative;
+    background:transparent;
+    padding:0;
+  }
+  /* Bordures épaisses des blocs 3×3 */
+  .case[data-c="2"], .case[data-c="5"]{ border-right:2.5px solid var(--trait-fort); }
+  .case[data-r="2"], .case[data-r="5"]{ border-bottom:2.5px solid var(--trait-fort); }
+
+  .case.zone{ background:var(--surbrillance); }
+  .case.identique{ background:var(--meme-chiffre); }
+  .case.selection{ background:var(--stylo-pale); box-shadow:inset 0 0 0 2px var(--stylo); }
+  .case.stylo{ color:var(--stylo); font-weight:600; }
+  .case.erreur{ color:var(--vermillon); font-weight:600; background:var(--vermillon-pale); }
+  .case.selection.erreur{ box-shadow:inset 0 0 0 2px var(--vermillon); }
+
+  .notes{
+    position:absolute;
+    inset:2px;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    grid-template-rows:repeat(3,1fr);
+    font-size:clamp(7px, 1.5vw, 10px);
+    color:var(--encre-douce);
+    font-family:var(--fmono);
+    pointer-events:none;
+  }
+  .notes span{ display:flex; align-items:center; justify-content:center; }
+
+  /* ---------- Pavé numérique ---------- */
+  .pave{
+    width:min(92vw, 480px);
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:repeat(9, 1fr);
+    gap:6px;
+  }
+  .touche{
+    font-family:var(--fmono);
+    font-size:clamp(16px, 4vw, 22px);
+    font-weight:600;
+    padding:10px 0 6px;
+    background:var(--grille);
+    border:1.5px solid var(--trait);
+    border-radius:var(--radius);
+    color:var(--stylo);
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:1px;
+    transition:transform .08s, border-color .15s;
+  }
+  .touche:hover{ border-color:var(--stylo); }
+  .touche:active{ transform:scale(.94); }
+  .touche .restant{
+    font-size:9px;
+    color:var(--encre-douce);
+    font-weight:400;
+  }
+  .touche.epuise{ opacity:.35; pointer-events:none; }
+
+  .outils{
+    width:min(92vw, 480px);
+    margin-top:10px;
+    display:flex;
+    gap:8px;
+  }
+  .outil{
+    flex:1;
+    font-family:var(--fsans);
+    font-size:13px;
+    font-weight:600;
+    padding:10px;
+    background:var(--grille);
+    border:1.5px solid var(--trait);
+    border-radius:var(--radius);
+    color:var(--encre);
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .outil:hover{ border-color:var(--encre); }
+  .outil[aria-pressed="true"]{
+    background:var(--encre);
+    color:#fff;
+    border-color:var(--encre);
+  }
+  .outil.primaire{
+    background:var(--vermillon);
+    border-color:var(--vermillon);
+    color:#fff;
+  }
+  .outil.primaire:hover{ background:#B03526; border-color:#B03526; }
+
+  /* ---------- Voile (victoire / défaite) ---------- */
+  .voile{
+    position:fixed;
+    inset:0;
+    background:rgba(24,39,66,.55);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    z-index:10;
+  }
+  .voile[hidden]{ display:none; }
+  .carte{
+    background:var(--grille);
+    border-radius:16px;
+    padding:34px 30px;
+    max-width:360px;
+    width:100%;
+    text-align:center;
+    box-shadow:0 24px 60px rgba(0,0,0,.25);
+  }
+  .carte h2{
+    font-family:var(--fdisplay);
+    font-weight:900;
+    font-size:30px;
+    margin-bottom:8px;
+  }
+  .carte h2.victoire{ color:var(--stylo); }
+  .carte h2.defaite{ color:var(--vermillon); }
+  .carte p{
+    color:var(--encre-douce);
+    font-size:14px;
+    margin-bottom:20px;
+    line-height:1.5;
+  }
+  .carte .stats{
+    font-family:var(--fmono);
+    font-size:14px;
+    color:var(--encre);
+    margin-bottom:20px;
+  }
+  .carte button{
+    width:100%;
+    font-family:var(--fsans);
+    font-size:15px;
+    font-weight:600;
+    padding:12px;
+    border:none;
+    border-radius:var(--radius);
+    background:var(--encre);
+    color:#fff;
+    cursor:pointer;
+  }
+  .carte button:hover{ background:#0F1B30; }
+
+  footer{
+    margin-top:26px;
+    font-family:var(--fmono);
+    font-size:11px;
+    color:var(--encre-douce);
+    letter-spacing:.08em;
+  }
+
+  @media (max-width:420px){
+    .etat{ font-size:12px; }
+    .outil{ font-size:12px; padding:9px 6px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">dchirez.fr — page de jeux</div>
+  <h1>SUDOKU<span class="point">.</span></h1>
+  <div class="sous-titre">Grilles à solution unique · 3 vies par partie</div>
+</header>
+
+<div class="difficultes" role="group" aria-label="Choix de la difficulté" id="difficultes">
+  <button class="chip" data-diff="0" aria-pressed="true">Facile</button>
+  <button class="chip" data-diff="1" aria-pressed="false">Moyen</button>
+  <button class="chip" data-diff="2" aria-pressed="false">Difficile</button>
+  <button class="chip" data-diff="3" aria-pressed="false">Expert</button>
+  <button class="chip" data-diff="4" aria-pressed="false">Extrême</button>
+</div>
+
+<div class="etat">
+  <div class="vies" id="vies" aria-label="Vies restantes">
+    <span class="coeur">♥</span><span class="coeur">♥</span><span class="coeur">♥</span>
+  </div>
+  <div id="nomDiff">Facile</div>
+  <div id="chrono" aria-label="Temps écoulé">00:00</div>
+</div>
+
+<div class="plateau" id="plateau" role="grid" aria-label="Grille de sudoku"></div>
+
+<div class="pave" id="pave"></div>
+
+<div class="outils">
+  <button class="outil" id="btnNotes" aria-pressed="false">✎ Notes</button>
+  <button class="outil" id="btnEffacer">⌫ Effacer</button>
+  <button class="outil primaire" id="btnNouvelle">Nouvelle partie</button>
+</div>
+
+<div class="voile" id="voile" hidden>
+  <div class="carte" role="alertdialog" aria-labelledby="voileTitre">
+    <h2 id="voileTitre"></h2>
+    <p id="voileTexte"></p>
+    <div class="stats" id="voileStats"></div>
+    <button id="voileBtn">Rejouer</button>
+  </div>
+</div>
+
+<footer>© dchirez.fr</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =============== Génération de grilles =============== */
+
+  function melanger(t){
+    for(let i=t.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [t[i],t[j]]=[t[j],t[i]];
+    }
+    return t;
+  }
+
+  function valide(g,r,c,v){
+    for(let i=0;i<9;i++){
+      if(g[r*9+i]===v || g[i*9+c]===v) return false;
+    }
+    const br=Math.floor(r/3)*3, bc=Math.floor(c/3)*3;
+    for(let i=0;i<3;i++)for(let j=0;j<3;j++){
+      if(g[(br+i)*9+bc+j]===v) return false;
+    }
+    return true;
+  }
+
+  // Remplit une grille complète par backtracking aléatoire
+  function remplir(g,pos){
+    if(pos===81) return true;
+    if(g[pos]!==0) return remplir(g,pos+1);
+    const r=Math.floor(pos/9), c=pos%9;
+    for(const v of melanger([1,2,3,4,5,6,7,8,9])){
+      if(valide(g,r,c,v)){
+        g[pos]=v;
+        if(remplir(g,pos+1)) return true;
+        g[pos]=0;
+      }
+    }
+    return false;
+  }
+
+  // Compte les solutions (s'arrête à `limite`)
+  function compterSolutions(g,limite){
+    let compte=0;
+    function bt(pos){
+      if(compte>=limite) return;
+      while(pos<81 && g[pos]!==0) pos++;
+      if(pos===81){ compte++; return; }
+      const r=Math.floor(pos/9), c=pos%9;
+      for(let v=1;v<=9;v++){
+        if(valide(g,r,c,v)){
+          g[pos]=v;
+          bt(pos+1);
+          g[pos]=0;
+          if(compte>=limite) return;
+        }
+      }
+    }
+    bt(0);
+    return compte;
+  }
+
+  // Indices conservés par difficulté (facile → extrême)
+  const INDICES=[40,34,30,26,23];
+
+  function genererPuzzle(diff){
+    const solution=new Array(81).fill(0);
+    remplir(solution,0);
+    const puzzle=solution.slice();
+    const cibles=INDICES[diff];
+    const ordre=melanger([...Array(81).keys()]);
+    let restants=81;
+    for(const pos of ordre){
+      if(restants<=cibles) break;
+      const sauvegarde=puzzle[pos];
+      puzzle[pos]=0;
+      if(compterSolutions(puzzle.slice(),2)!==1){
+        puzzle[pos]=sauvegarde; // retrait annulé : solution non unique
+      }else{
+        restants--;
+      }
+    }
+    return {puzzle, solution};
+  }
+
+  /* =============== État de la partie =============== */
+
+  const NOMS=["Facile","Moyen","Difficile","Expert","Extrême"];
+  let diff=0;
+  let puzzle=[], solution=[], grille=[], notes=[];
+  let vies=3, selection=-1, modeNotes=false, terminee=false;
+  let secondes=0, minuterie=null;
+
+  const $=id=>document.getElementById(id);
+  const plateau=$("plateau"), pave=$("pave");
+  const cases=[];
+
+  /* =============== Construction du DOM =============== */
+
+  for(let i=0;i<81;i++){
+    const b=document.createElement("button");
+    b.className="case";
+    b.dataset.r=Math.floor(i/9);
+    b.dataset.c=i%9;
+    b.setAttribute("role","gridcell");
+    b.addEventListener("click",()=>selectionner(i));
+    plateau.appendChild(b);
+    cases.push(b);
+  }
+
+  const touches=[];
+  for(let v=1;v<=9;v++){
+    const b=document.createElement("button");
+    b.className="touche";
+    b.innerHTML=v+'<span class="restant">9</span>';
+    b.setAttribute("aria-label","Placer le chiffre "+v);
+    b.addEventListener("click",()=>saisir(v));
+    pave.appendChild(b);
+    touches.push(b);
+  }
+
+  /* =============== Logique de jeu =============== */
+
+  function nouvellePartie(){
+    const res=genererPuzzle(diff);
+    puzzle=res.puzzle;
+    solution=res.solution;
+    grille=puzzle.slice();
+    notes=Array.from({length:81},()=>new Set());
+    vies=3; selection=-1; terminee=false; secondes=0;
+    $("voile").hidden=true;
+    $("nomDiff").textContent=NOMS[diff];
+    majVies();
+    dessiner();
+    clearInterval(minuterie);
+    majChrono();
+    minuterie=setInterval(()=>{ if(!terminee){ secondes++; majChrono(); } },1000);
+  }
+
+  function majChrono(){
+    const m=String(Math.floor(secondes/60)).padStart(2,"0");
+    const s=String(secondes%60).padStart(2,"0");
+    $("chrono").textContent=m+":"+s;
+  }
+
+  function majVies(){
+    const coeurs=$("vies").children;
+    for(let i=0;i<3;i++){
+      coeurs[i].classList.toggle("perdu", i>=vies);
+    }
+  }
+
+  function selectionner(i){
+    if(terminee) return;
+    selection=i;
+    dessiner();
+  }
+
+  function saisir(v){
+    if(terminee || selection<0) return;
+    if(puzzle[selection]!==0) return;               // indice imprimé : intouchable
+    if(grille[selection]===solution[selection]) return; // déjà juste
+
+    if(modeNotes){
+      if(grille[selection]===0){
+        const n=notes[selection];
+        n.has(v)?n.delete(v):n.add(v);
+        dessiner();
+      }
+      return;
+    }
+
+    notes[selection].clear();
+    grille[selection]=v;
+
+    if(v!==solution[selection]){
+      vies--;
+      majVies();
+      const zone=$("vies");
+      zone.classList.remove("secoue");
+      void zone.offsetWidth;
+      zone.classList.add("secoue");
+      if(vies<=0){
+        terminee=true;
+        dessiner();
+        finDePartie(false);
+        return;
+      }
+    }else{
+      // efface la note v dans la ligne, colonne et le bloc
+      const r=Math.floor(selection/9), c=selection%9;
+      const br=Math.floor(r/3)*3, bc=Math.floor(c/3)*3;
+      for(let k=0;k<9;k++){
+        notes[r*9+k].delete(v);
+        notes[k*9+c].delete(v);
+        notes[(br+Math.floor(k/3))*9+bc+(k%3)].delete(v);
+      }
+    }
+
+    dessiner();
+
+    if(grille.every((x,i)=>x===solution[i])){
+      terminee=true;
+      finDePartie(true);
+    }
+  }
+
+  function effacer(){
+    if(terminee || selection<0) return;
+    if(puzzle[selection]!==0) return;
+    if(grille[selection]===solution[selection] && grille[selection]!==0) return;
+    grille[selection]=0;
+    notes[selection].clear();
+    dessiner();
+  }
+
+  function finDePartie(victoire){
+    clearInterval(minuterie);
+    const titre=$("voileTitre");
+    titre.textContent=victoire?"Grille résolue !":"Plus de vies…";
+    titre.className=victoire?"victoire":"defaite";
+    $("voileTexte").textContent=victoire
+      ? "Bien joué, la grille est complète et sans faute restante."
+      : "Trois erreurs, la partie s'arrête là. On remet ça ?";
+    $("voileStats").textContent=NOMS[diff]+" · "+$("chrono").textContent;
+    $("voileBtn").textContent=victoire?"Nouvelle grille":"Rejouer";
+    $("voile").hidden=false;
+    $("voileBtn").focus();
+  }
+
+  /* =============== Rendu =============== */
+
+  function dessiner(){
+    const sr=selection>=0?Math.floor(selection/9):-1;
+    const sc=selection>=0?selection%9:-1;
+    const sv=selection>=0?grille[selection]:0;
+    const compte=new Array(10).fill(0);
+    for(const v of grille) compte[v]++;
+
+    for(let i=0;i<81;i++){
+      const el=cases[i];
+      const r=Math.floor(i/9), c=i%9;
+      const v=grille[i];
+      const estIndice=puzzle[i]!==0;
+      const estErreur=v!==0 && v!==solution[i];
+
+      el.className="case";
+      if(!estIndice && v!==0) el.classList.add(estErreur?"erreur":"stylo");
+
+      if(selection>=0){
+        const memeZone = r===sr || c===sc ||
+          (Math.floor(r/3)===Math.floor(sr/3) && Math.floor(c/3)===Math.floor(sc/3));
+        if(memeZone && i!==selection) el.classList.add("zone");
+        if(sv!==0 && v===sv && i!==selection) el.classList.add("identique");
+        if(i===selection) el.classList.add("selection");
+        if(i===selection && estErreur) el.classList.add("erreur");
+      }
+      if(estErreur) el.classList.add("erreur");
+
+      if(v!==0){
+        el.textContent=v;
+      }else if(notes[i] && notes[i].size){
+        el.textContent="";
+        const grid=document.createElement("div");
+        grid.className="notes";
+        for(let n=1;n<=9;n++){
+          const s=document.createElement("span");
+          s.textContent=notes[i].has(n)?n:"";
+          grid.appendChild(s);
+        }
+        el.appendChild(grid);
+      }else{
+        el.textContent="";
+      }
+    }
+
+    for(let v=1;v<=9;v++){
+      // nombre de v encore corrects à placer
+      let places=0;
+      for(let i=0;i<81;i++) if(grille[i]===v && grille[i]===solution[i]) places++;
+      const restant=9-places;
+      touches[v-1].querySelector(".restant").textContent=restant;
+      touches[v-1].classList.toggle("epuise", restant<=0);
+    }
+  }
+
+  /* =============== Événements =============== */
+
+  document.querySelectorAll(".chip").forEach(chip=>{
+    chip.addEventListener("click",()=>{
+      diff=Number(chip.dataset.diff);
+      document.querySelectorAll(".chip").forEach(c=>
+        c.setAttribute("aria-pressed", c===chip ? "true":"false"));
+      nouvellePartie();
+    });
+  });
+
+  $("btnNouvelle").addEventListener("click",nouvellePartie);
+  $("btnEffacer").addEventListener("click",effacer);
+  $("btnNotes").addEventListener("click",()=>{
+    modeNotes=!modeNotes;
+    $("btnNotes").setAttribute("aria-pressed",modeNotes?"true":"false");
+  });
+  $("voileBtn").addEventListener("click",nouvellePartie);
+
+  document.addEventListener("keydown",e=>{
+    if(e.key>="1" && e.key<="9"){ saisir(Number(e.key)); }
+    else if(e.key==="Backspace" || e.key==="Delete"){ effacer(); e.preventDefault(); }
+    else if(e.key==="n" || e.key==="N"){ $("btnNotes").click(); }
+    else if(e.key.startsWith("Arrow") && selection>=0){
+      e.preventDefault();
+      let r=Math.floor(selection/9), c=selection%9;
+      if(e.key==="ArrowUp") r=Math.max(0,r-1);
+      if(e.key==="ArrowDown") r=Math.min(8,r+1);
+      if(e.key==="ArrowLeft") c=Math.max(0,c-1);
+      if(e.key==="ArrowRight") c=Math.min(8,c+1);
+      selectionner(r*9+c);
+    }
+  });
+
+  nouvellePartie();
+})();
+</script>
+</body>
+</html>
