@@ -7,25 +7,29 @@
 <meta name="description" content="Jouez au sudoku en ligne : 5 niveaux de difficulté, 3 vies par partie. Grilles à solution unique générées à la volée.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="ds.css">
 <style>
+  /* Les rôles du jeu sont branchés sur les tokens du design system (ds.css) :
+     l'orange reste la marque, le violet marque les chiffres joués, le rouge
+     est réservé aux erreurs et aux vies perdues. */
   :root{
-    --papier:#EFF1F4;
-    --grille:#FFFFFF;
-    --encre:#182742;
-    --encre-douce:#5B6472;
-    --stylo:#2B5BB7;
-    --stylo-pale:#DCE6F7;
-    --vermillon:#C8402F;
-    --vermillon-pale:#F7E2DE;
-    --trait:#C6CBD4;
-    --trait-fort:#182742;
-    --surbrillance:#E7ECF3;
-    --meme-chiffre:#D8E2F2;
-    --radius:10px;
-    --fdisplay:'Bitter', Georgia, serif;
-    --fmono:'IBM Plex Mono', 'Courier New', monospace;
-    --fsans:'IBM Plex Sans', system-ui, sans-serif;
+    --papier:var(--bg-page);
+    --grille:var(--surface-card);
+    --encre:var(--text-strong);
+    --encre-douce:var(--text-muted);
+    --stylo:var(--accent-2);
+    --stylo-pale:var(--accent-2-soft);
+    --erreur:var(--red-500);
+    --erreur-pale:rgba(220, 38, 38, .12);
+    --trait:var(--border);
+    --trait-fort:var(--text-strong);
+    --surbrillance:var(--surface-sunken);
+    --meme-chiffre:var(--accent-soft);
+    --radius:var(--radius-md);
+    --fdisplay:var(--font-display);
+    --fmono:var(--font-mono);
+    --fsans:var(--font-sans);
   }
   *{ box-sizing:border-box; margin:0; padding:0; }
   html{ -webkit-text-size-adjust:100%; }
@@ -51,12 +55,12 @@
   }
   h1{
     font-family:var(--fdisplay);
-    font-weight:900;
+    font-weight:var(--weight-bold);
     font-size:clamp(34px, 7vw, 52px);
-    letter-spacing:.04em;
-    line-height:1.05;
+    letter-spacing:var(--tracking-tight);
+    line-height:var(--leading-tight);
   }
-  h1 .point{ color:var(--vermillon); }
+  h1 .point{ color:var(--accent); }
   .sous-titre{
     font-size:13px;
     color:var(--encre-douce);
@@ -85,13 +89,13 @@
   }
   .chip:hover{ border-color:var(--encre); color:var(--encre); }
   .chip[aria-pressed="true"]{
-    background:var(--encre);
-    border-color:var(--encre);
-    color:#fff;
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--accent-on);
   }
   .chip:focus-visible, button:focus-visible{
-    outline:3px solid var(--stylo);
-    outline-offset:2px;
+    outline:none;
+    box-shadow:var(--ring-accent);
   }
 
   /* ---------- Barre d'état ---------- */
@@ -109,7 +113,7 @@
   .coeur{
     font-size:20px;
     line-height:1;
-    color:var(--vermillon);
+    color:var(--erreur);
     transition:transform .25s, color .25s, opacity .25s;
   }
   .coeur.perdu{
@@ -122,7 +126,7 @@
     position:absolute;
     left:-3px; right:-3px; top:50%;
     height:2.5px;
-    background:var(--vermillon);
+    background:var(--erreur);
     transform:rotate(-18deg);
   }
   @keyframes secousse{
@@ -144,11 +148,11 @@
     aspect-ratio:1;
     background:var(--grille);
     border:3px solid var(--trait-fort);
-    border-radius:6px;
+    border-radius:var(--radius-md);
     display:grid;
     grid-template-columns:repeat(9, 1fr);
     grid-template-rows:repeat(9, 1fr);
-    box-shadow:0 10px 30px rgba(24,39,66,.10);
+    box-shadow:var(--shadow-md);
     user-select:none;
     touch-action:manipulation;
   }
@@ -174,8 +178,8 @@
   .case.identique{ background:var(--meme-chiffre); }
   .case.selection{ background:var(--stylo-pale); box-shadow:inset 0 0 0 2px var(--stylo); }
   .case.stylo{ color:var(--stylo); font-weight:600; }
-  .case.erreur{ color:var(--vermillon); font-weight:600; background:var(--vermillon-pale); }
-  .case.selection.erreur{ box-shadow:inset 0 0 0 2px var(--vermillon); }
+  .case.erreur{ color:var(--erreur); font-weight:600; background:var(--erreur-pale); }
+  .case.selection.erreur{ box-shadow:inset 0 0 0 2px var(--erreur); }
 
   .notes{
     position:absolute;
@@ -244,22 +248,25 @@
   }
   .outil:hover{ border-color:var(--encre); }
   .outil[aria-pressed="true"]{
-    background:var(--encre);
-    color:#fff;
-    border-color:var(--encre);
+    background:var(--accent-2);
+    color:var(--text-on-accent);
+    border-color:var(--accent-2);
   }
   .outil.primaire{
-    background:var(--vermillon);
-    border-color:var(--vermillon);
-    color:#fff;
+    background:var(--brand-gradient);
+    background-clip:padding-box;
+    border-color:transparent;
+    color:var(--text-on-accent);
+    box-shadow:var(--shadow-accent);
   }
-  .outil.primaire:hover{ background:#B03526; border-color:#B03526; }
+  .outil.primaire:hover{ box-shadow:var(--shadow-lg); }
 
   /* ---------- Voile (victoire / défaite) ---------- */
   .voile{
     position:fixed;
     inset:0;
-    background:rgba(24,39,66,.55);
+    background:rgba(9,9,11,.55);
+    backdrop-filter:blur(6px);
     display:flex;
     align-items:center;
     justify-content:center;
@@ -269,21 +276,22 @@
   .voile[hidden]{ display:none; }
   .carte{
     background:var(--grille);
-    border-radius:16px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-xl);
     padding:34px 30px;
     max-width:360px;
     width:100%;
     text-align:center;
-    box-shadow:0 24px 60px rgba(0,0,0,.25);
+    box-shadow:var(--shadow-lg);
   }
   .carte h2{
     font-family:var(--fdisplay);
-    font-weight:900;
+    font-weight:var(--weight-bold);
     font-size:30px;
     margin-bottom:8px;
   }
-  .carte h2.victoire{ color:var(--stylo); }
-  .carte h2.defaite{ color:var(--vermillon); }
+  .carte h2.victoire{ color:var(--accent); }
+  .carte h2.defaite{ color:var(--erreur); }
   .carte p{
     color:var(--encre-douce);
     font-size:14px;
@@ -301,14 +309,16 @@
     font-family:var(--fsans);
     font-size:15px;
     font-weight:600;
-    padding:12px;
+    padding:14px;
     border:none;
-    border-radius:var(--radius);
-    background:var(--encre);
-    color:#fff;
+    border-radius:var(--radius-pill);
+    background:var(--brand-gradient);
+    color:var(--text-on-accent);
+    box-shadow:var(--shadow-accent);
     cursor:pointer;
+    transition:transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-base);
   }
-  .carte button:hover{ background:#0F1B30; }
+  .carte button:hover{ transform:translateY(-2px); box-shadow:var(--shadow-lg); }
 
   footer{
     margin-top:26px;
